@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Orders</title>
+    <style>
+      body { font-family: sans-serif; padding: 2rem; max-width: 800px; margin: 0 auto; }
+      table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+      th, td { border: 1px solid #ccc; padding: 0.5rem; text-align: left; }
+      @keyframes flash {
+        0%   { background: #d4f5e9; }
+        100% { background: transparent; }
+      }
+      .flash { animation: flash 2s ease-out; }
+      #status { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: red; margin-right: 0.5rem; }
+    </style>
+</head>
+<body>
+    <h2><span id="status"></span>Real-Time Orders</h2>
+    <table>
+      <thead>
+        <tr><th>ID</th><th>Customer</th><th>Product</th><th>Status</th></tr>
+      </thead>
+      <tbody id="orders-body">
+        <!-- Rows will be injected here -->
+      </tbody>
+    </table>
+
+    <script>
+      const tbody = document.getElementById('orders-body');
+      const evtSource = new EventSource('/events');
+      const statusDot = document.getElementById('status');
+
+      evtSource.onopen = () => {
+        statusDot.style.background = 'green';
+      };
+
+      function addRow(data) {
+        const tr = document.createElement('tr');
+        tr.id = `order-${data.id}`;
+        tr.className = 'flash';
+        tr.innerHTML = `<td>${data.id}</td><td>${data.customer_name}</td><td>${data.product_name}</td><td>${data.status}</td>`;
+        tbody.appendChild(tr);
+        setTimeout(() => tr.classList.remove('flash'), 2000);
+      }
+
+      function updateRow(data) {
+        let tr = document.getElementById(`order-${data.id}`);
+        if (!tr) {
+          addRow(data);
+          return;
+        }
+        tr.className = 'flash';
+        tr.innerHTML = `<td>${data.id}</td><td>${data.customer_name}</td><td>${data.product_name}</td><td>${data.status}</td>`;
+        setTimeout(() => tr.classList.remove('flash'), 2000);
+      }
+
+      function removeRow(id) {
+        const tr = document.getElementById(`order-${id}`);
+        if (tr) tr.remove();
+      }
+
+      evtSource.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'connected') return;
+
+        if (msg.operation === 'INSERT')  addRow(msg.data);
+        if (msg.operation === 'UPDATE')  updateRow(msg.data);
+        if (msg.operation === 'DELETE')  removeRow(msg.data.id);
+      };
+
+      evtSource.onerror = () => {
+        statusDot.style.background = 'red';
+      };
+    </script>
+</body>
+</html>
